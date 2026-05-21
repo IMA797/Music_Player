@@ -1,0 +1,17 @@
+<!doctype html>
+<html>
+
+<head>
+    {% if title %}
+    <title>{{ title }} - Music_Player</title>
+    {% else %}
+    <title>Welcome to Music_Player</title>
+    {% endif %}
+</head>
+
+<body>
+    <div>Music_Player: <a href="/index">Home</a></div>
+    <hr> {% block content %}{% endblock %}
+</body>
+
+</html>

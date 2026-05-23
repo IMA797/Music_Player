@@ -4,4 +4,4 @@
 *.flaskenv
 *.migrations
 *.env
-*.uploads
+uploads/

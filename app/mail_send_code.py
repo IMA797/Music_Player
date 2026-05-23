@@ -25,7 +25,7 @@ def create_verification_message(recipient_email, code):
 """
 
     msg = MIMEText(message_text, 'plain', 'utf-8')
-    msg['From'] = f"{Config.SENDER_NAME} <{Config.LOGIN}>"
+    msg['From'] = f"{Config.SENDER_NAME} <{Config.SMTP_LOGIN}>"
     msg['To'] = recipient_email
     msg['Subject'] = "Код подтверждения"
     msg['X-Priority'] = '1'
@@ -42,12 +42,12 @@ def send_verification_email(recipient_email, code):
     
     try:
         with smtplib.SMTP(Config.SMTP_SERVER, Config.SMTP_PORT) as server:
-            #Шифрование          
+            #Шифрование tls        
             server.starttls()
             #Авторизация
-            server.login(Config.LOGIN, Config.PASSWORD)
+            server.login(Config.SMTP_LOGIN, Config.SMTP_PASSWORD)
             #Отправка письма
-            server.sendmail(Config.LOGIN, recipient_email, msg.as_string())
+            server.sendmail(Config.SMTP_LOGIN, recipient_email, msg.as_string())
         
         print(f"Письмо с кодом отправлено на {recipient_email}")
         return True

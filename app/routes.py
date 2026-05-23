@@ -1,6 +1,6 @@
 from flask import render_template, flash, redirect, url_for, request, session
 from app import app, db
-from app.forms import LoginForm, RegistrationForm, VerificationForm
+from app.forms import LoginForm, RegistrationForm, VerificationForm, AddMusic
 from flask_login import current_user, login_user, logout_user, login_required
 from app.models import *
 import sqlalchemy as sa
@@ -9,6 +9,8 @@ from app.mail_send_code import generate_verification_code, send_verification_ema
 from datetime import datetime, timedelta
 from config import Config
 from sqlite3 import IntegrityError
+import os
+import uuid
 
 @app.route('/')
 @app.route('/index')
@@ -158,3 +160,32 @@ def verify():
         return redirect(url_for('login'))
     
     return render_template('verify.html', title='Verify', form=form)
+
+@app.route("/upload", methods=["GET", "POST"])
+@login_required
+def upload():
+    form = AddMusic()
+    if form.validate_on_submit():
+        files = form.file.data
+
+        #Получаем оригинальное расширение файла
+        ext = files.filename.rsplit(".", 1)[1].lower()
+        #Уникальное имя файла
+        unique_name = uuid.uuid4().hex + '.' + ext
+        #Полный путь, куда будем сохранять файд
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], unique_name)
+        
+        files.save(filepath)
+
+        track = Track(
+            title = form.title.data,
+            artist = form.artist.data,
+            filename = unique_name,
+            user_id = current_user.id
+        )
+
+        db.session.add(track)
+        db.session.commit()
+
+        return redirect(url_for('upload'))
+    return render_template('upload.html', title="Save", form=form)

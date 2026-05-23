@@ -15,6 +15,8 @@ class User(UserMixin, db.Model):
     # Optional - данный столбец может быть пустым или обнуляемым
     password_hash: so.Mapped[Optional[str]] = so.mapped_column(sa.String(256))
     
+    tracks: so.WriteOnlyMapped['Track'] = so.relationship(back_populates='user')
+
     def __repr__(self):
         return '<User {}>'.format(self.username)
     
@@ -24,6 +26,8 @@ class User(UserMixin, db.Model):
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
 
+
+    
 @login.user_loader
 def load_user(id):
     return db.session.get(User, int(id))
@@ -42,3 +46,13 @@ class PendingUser(db.Model):
     
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
+    
+class Track(db.Model):
+    id: so.Mapped[int] = so.mapped_column(primary_key=True)
+    title: so.Mapped[str] = so.mapped_column(sa.String(120), index=True)
+    artist: so.Mapped[str] = so.mapped_column(sa.String(120), index=True)
+    filename: so.Mapped[str] = so.mapped_column(sa.String(120), index=True, unique=True)
+    user_id: so.Mapped[int] = so.mapped_column(sa.ForeignKey('user.id'), index=True)
+    uploaded_at: so.Mapped[datetime] = so.mapped_column(sa.DateTime, default=datetime.utcnow)
+
+    user: so.Mapped['User'] = so.relationship(back_populates='tracks')

@@ -1,6 +1,7 @@
 from flask_wtf import FlaskForm
+from flask_wtf.file import FileField, FileAllowed, FileRequired
 from wtforms import StringField, PasswordField, BooleanField, SubmitField
-from wtforms.validators import ValidationError, DataRequired, Email, EqualTo, Length
+from wtforms.validators import *
 import sqlalchemy as sa
 from app import db
 from app.models import User
@@ -32,5 +33,11 @@ class RegistrationForm(FlaskForm):
             raise ValidationError('Please use a different email address.')
         
 class VerificationForm(FlaskForm):
-    code = StringField('code', validators=[DataRequired(), Length(min=6, max=6, message='Код должен быть 6 символов')])
+    code = StringField('Code', validators=[DataRequired(), Length(min=6, max=6, message='Код должен быть 6 символов')])
     submit = SubmitField('Verify')
+
+class AddMusic(FlaskForm):
+    title = StringField('Title', validators=[DataRequired()])
+    artist = StringField('Artist', validators=[DataRequired()])
+    file = FileField('File', validators=[FileRequired(), FileAllowed(['mp3', 'wav', 'ogg', 'flac'], 'Только аудиофайлы!')])
+    submit = SubmitField('Save')

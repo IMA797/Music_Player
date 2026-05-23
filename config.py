@@ -16,3 +16,5 @@ class Config:
     SMTP_PASSWORD = os.environ.get('SMTP_PASSWORD') or ''
     SENDER_NAME = os.environ.get('SENDER_NAME') or 'Music_Player'
     CODE_EXPIRY_MINUTES = 5
+
+    UPLOAD_FOLDER = os.path.join(basedir, 'uploads')

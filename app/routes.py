@@ -16,58 +16,7 @@ import uuid
 @app.route('/index')
 @login_required
 def index():
-    query = request.args.get('q', '')
-    track_id = request.args.get('track', type=int)
-    
-    #Треки для очереди
-    tracks = db.session.scalars(
-        sa.select(Track).order_by(Track.uploaded_at.desc())
-    ).all()
-    
-    current_track = None
-    prev_track = None
-    next_track = None
-    
-    if tracks:
-        # Определяем текущий трек
-        if track_id:
-            current_track = db.session.get(Track, track_id)
-            if current_track not in tracks:
-                current_track = None
-        
-        if not current_track and query:
-            # Ищем первый подходящий по поиску
-            for track in tracks:
-                if query.lower() in track.title.lower():
-                    current_track = track
-                    break
-        
-        if current_track and current_track in tracks:
-            # Перестраиваем очередь: текущий трек первый, остальные за ним по кругу
-            track_ids = [t.id for t in tracks]
-            current_index = track_ids.index(current_track.id)
-
-            # Новая очередь: с текущего до конца + с начала до текущего (без повтора текущего)
-            reordered = tracks[current_index:] + tracks[:current_index]
-            tracks = reordered
-
-            # В новой очереди текущий трек всегда первый
-            if len(tracks) > 1:
-                next_track = tracks[1]
-            else:
-                next_track = None
-
-            prev_track = None  
-
-    return render_template(
-        'index.html',
-        title='Home',
-        tracks=tracks,
-        current_track=current_track,
-        prev_track=prev_track,
-        next_track=next_track,
-        query=query
-    )
+    return render_template('index.html', title="Home")
 
 @app.route("/login", methods=['GET', 'POST'])
 def login():
@@ -154,6 +103,7 @@ def register():
         return redirect(url_for('verify'))
     
     return render_template('register.html', title='Register', form=form)
+
 @app.route('/verify', methods=["GET", "POST"])
 def verify():
     if current_user.is_authenticated:
@@ -212,7 +162,7 @@ def upload():
         ext = files.filename.rsplit(".", 1)[1].lower()
         #Уникальное имя файла
         unique_name = uuid.uuid4().hex + '.' + ext
-        #Полный путь, куда будем сохранять файд
+        #Полный путь, куда будем сохранять файл
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], unique_name)
         
         files.save(filepath)
@@ -235,3 +185,50 @@ def upload():
 def play_track(track_id):
     track = db.session.get(Track, track_id)
     return send_from_directory(app.config['UPLOAD_FOLDER'], track.filename)
+
+@app.route("/search", methods=["GET", "POST"])
+def search_track():
+    query = request.args.get('q', '')
+    tracks = []
+    
+    if query:
+        tracks = db.session.scalars(
+            sa.select(Track).where(Track.title.ilike(f'%{query}%')).order_by(Track.uploaded_at.desc())
+        ).all()
+    
+    return render_template('search.html', title='Поиск', tracks=tracks, query=query)
+
+
+@app.route('/player')
+@login_required
+def player():
+    track_id = request.args.get('track', type=int)
+    
+    tracks = db.session.scalars(
+        sa.select(Track).order_by(Track.uploaded_at.desc())
+    ).all()
+    
+    current_track = None
+    next_track = None
+    
+    if track_id and tracks:
+        current_track = db.session.get(Track, track_id)
+        
+        if current_track and current_track in tracks:
+            # Перестраиваем очередь: текущий первый, остальные за ним
+            track_ids = [t.id for t in tracks]
+            current_index = track_ids.index(current_track.id)
+            
+            reordered = tracks[current_index:] + tracks[:current_index]
+            tracks = reordered
+            
+            if len(tracks) > 1:
+                next_track = tracks[1]
+    
+    return render_template(
+        'player.html',
+        title='Плеер',
+        current_track=current_track,
+        next_track=next_track,
+        tracks=tracks
+    )

@@ -1,0 +1,18 @@
+{% extends "base.html" %} {% block content %}
+<h1>Поиск</h1>
+
+<form method="get" action="{{ url_for('search_track') }}">
+    <input type="text" name="q" placeholder="Поиск по названию..." value="{{ query or '' }}">
+    <button type="submit">Найти</button> {% if query %}<a href="{{ url_for('search_track') }}">Сбросить</a>{% endif %}
+</form>
+
+{% if query and tracks %}
+<h2>Результаты:</h2>
+{% for track in tracks %}
+<div style="border: 1px solid #ccc; padding: 10px; margin: 10px 0;">
+    <strong>{{ track.title }}</strong> — {{ track.artist }}
+    <a href="{{ url_for('player', track=track.id) }}">▶ Играть</a>
+</div>
+{% endfor %} {% elif query and not tracks %}
+<p>Ничего не найдено.</p>
+{% endif %} {% endblock %}

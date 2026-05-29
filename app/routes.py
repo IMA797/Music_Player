@@ -1,4 +1,4 @@
-from flask import render_template, flash, redirect, url_for, request, session
+from flask import render_template, flash, redirect, url_for, request, session, send_from_directory
 from app import app, db
 from app.forms import LoginForm, RegistrationForm, VerificationForm, AddMusic
 from flask_login import current_user, login_user, logout_user, login_required
@@ -16,18 +16,58 @@ import uuid
 @app.route('/index')
 @login_required
 def index():
-    user = {'username': 'Miguel'}
-    posts = [
-    {
-        'author': {'username': 'John'},
-        'body': 'Beautiful day in Portland!'
-    },
-    {
-        'author': {'username': 'Susan'},
-        'body': 'The Avengers movie was so cool!'
-    }
-    ]
-    return render_template('index.html', title='Home', posts=posts)
+    query = request.args.get('q', '')
+    track_id = request.args.get('track', type=int)
+    
+    #Треки для очереди
+    tracks = db.session.scalars(
+        sa.select(Track).order_by(Track.uploaded_at.desc())
+    ).all()
+    
+    current_track = None
+    prev_track = None
+    next_track = None
+    
+    if tracks:
+        # Определяем текущий трек
+        if track_id:
+            current_track = db.session.get(Track, track_id)
+            if current_track not in tracks:
+                current_track = None
+        
+        if not current_track and query:
+            # Ищем первый подходящий по поиску
+            for track in tracks:
+                if query.lower() in track.title.lower():
+                    current_track = track
+                    break
+        
+        if current_track and current_track in tracks:
+            # Перестраиваем очередь: текущий трек первый, остальные за ним по кругу
+            track_ids = [t.id for t in tracks]
+            current_index = track_ids.index(current_track.id)
+
+            # Новая очередь: с текущего до конца + с начала до текущего (без повтора текущего)
+            reordered = tracks[current_index:] + tracks[:current_index]
+            tracks = reordered
+
+            # В новой очереди текущий трек всегда первый
+            if len(tracks) > 1:
+                next_track = tracks[1]
+            else:
+                next_track = None
+
+            prev_track = None  
+
+    return render_template(
+        'index.html',
+        title='Home',
+        tracks=tracks,
+        current_track=current_track,
+        prev_track=prev_track,
+        next_track=next_track,
+        query=query
+    )
 
 @app.route("/login", methods=['GET', 'POST'])
 def login():
@@ -189,3 +229,9 @@ def upload():
 
         return redirect(url_for('upload'))
     return render_template('upload.html', title="Save", form=form)
+
+@app.route("/play/<int:track_id>")
+@login_required
+def play_track(track_id):
+    track = db.session.get(Track, track_id)
+    return send_from_directory(app.config['UPLOAD_FOLDER'], track.filename)

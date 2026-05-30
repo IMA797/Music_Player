@@ -1,4 +1,4 @@
-from flask import render_template, flash, redirect, url_for, request, session, send_from_directory
+from flask import render_template, flash, redirect, url_for, request, session, send_from_directory, abort
 from app import app, db
 from app.forms import LoginForm, RegistrationForm, VerificationForm, AddMusic
 from flask_login import current_user, login_user, logout_user, login_required
@@ -11,6 +11,16 @@ from config import Config
 from sqlite3 import IntegrityError
 import os
 import uuid
+from functools import wraps
+from app.mail_send_track_approved import send_track_approved_email, send_track_not_approved_email
+
+def admin_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not current_user.is_authenticated or current_user.role != 'admin':
+            abort(403)
+        return f(*args, **kwargs)
+    return decorated
 
 @app.route('/')
 @app.route('/index')
@@ -165,17 +175,21 @@ def upload():
         #Полный путь, куда будем сохранять файл
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], unique_name)
         
+
         files.save(filepath)
 
         track = Track(
             title = form.title.data,
             artist = form.artist.data,
             filename = unique_name,
-            user_id = current_user.id
+            user_id = current_user.id,
+            status = 'pending'
         )
 
         db.session.add(track)
         db.session.commit()
+
+        flash('Трек отправлен на модерацию.')
 
         return redirect(url_for('upload'))
     return render_template('upload.html', title="Save", form=form)
@@ -193,7 +207,7 @@ def search_track():
     
     if query:
         tracks = db.session.scalars(
-            sa.select(Track).where(Track.title.ilike(f'%{query}%')).order_by(Track.uploaded_at.desc())
+            sa.select(Track).where(Track.title.ilike(f'%{query}%'), Track.status == 'approved').order_by(Track.uploaded_at.desc())
         ).all()
     
     return render_template('search.html', title='Поиск', tracks=tracks, query=query)
@@ -205,7 +219,7 @@ def player():
     track_id = request.args.get('track', type=int)
     
     tracks = db.session.scalars(
-        sa.select(Track).order_by(Track.uploaded_at.desc())
+        sa.select(Track).where(Track.status == 'approved').order_by(Track.uploaded_at.desc())
     ).all()
     
     current_track = None
@@ -232,3 +246,47 @@ def player():
         next_track=next_track,
         tracks=tracks
     )
+
+@app.route('/admin')
+@admin_required
+def admin():
+    tracks = db.session.scalars(
+        sa.select(Track).where(Track.status == 'pending').order_by(Track.uploaded_at.desc())
+    ).all()
+
+    return render_template('admin.html', title='Админ-панель', tracks=tracks)
+
+@app.route('/admin/approve/<int:track_id>', methods=["POST"])
+@admin_required
+def approve_track(track_id):
+    track = db.session.get(Track, track_id)
+    if track and track.status == 'pending':
+        track.status = 'approved'
+        
+        db.session.commit()
+        
+        send_track_approved_email(track.user.email)
+        flash('Трек одобрен')
+
+        return redirect(url_for('admin'))
+    else:
+        flash('Трек не найден или уже обработан.')
+        return redirect(url_for('admin'))
+    
+@app.route('/admin/reject/<int:track_id>', methods=["POST"])
+@admin_required 
+def reject_track(track_id):
+    track = db.session.get(Track, track_id)
+    if track and track.status == 'pending':
+        track.status = 'rejected'
+
+        db.session.commit()
+
+        send_track_not_approved_email(track.user.email)
+        flash('Трек не одобрен')
+
+        return redirect(url_for('admin'))
+    else:
+        flash('Трек не найден или уже обработан.')
+        return redirect(url_for('admin'))
+    

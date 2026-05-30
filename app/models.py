@@ -15,6 +15,7 @@ class User(UserMixin, db.Model):
     # Optional - данный столбец может быть пустым или обнуляемым
     password_hash: so.Mapped[Optional[str]] = so.mapped_column(sa.String(256))
     
+    role: so.Mapped[str] = so.mapped_column(sa.String(10), index=True, default='user')
     tracks: so.WriteOnlyMapped['Track'] = so.relationship(back_populates='user')
 
     def __repr__(self):
@@ -54,5 +55,6 @@ class Track(db.Model):
     filename: so.Mapped[str] = so.mapped_column(sa.String(120), index=True, unique=True)
     user_id: so.Mapped[int] = so.mapped_column(sa.ForeignKey('user.id'), index=True)
     uploaded_at: so.Mapped[datetime] = so.mapped_column(sa.DateTime, default=datetime.utcnow)
-
+    status: so.Mapped[str] = so.mapped_column(sa.String(20), index=True, default='pending')
+    
     user: so.Mapped['User'] = so.relationship(back_populates='tracks')

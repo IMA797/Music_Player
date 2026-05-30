@@ -1,0 +1,23 @@
+{% extends "base.html" %} {% block content %}
+<h1>Модерация треков</h1>
+
+{% if tracks %} {% for track in tracks %}
+<div style="border: 1px solid #ccc; padding: 10px; margin: 10px 0;">
+    <strong>{{ track.title }}</strong> — {{ track.artist }}
+    <p>Загрузил: {{ track.user.username }}</p>
+    <audio controls style="width: 100%; margin: 5px 0;">
+                <source src="{{ url_for('play_track', track_id=track.id) }}" type="audio/mpeg">
+            </audio>
+    <form method="post" action="{{ url_for('approve_track', track_id=track.id) }}" style="display: inline;">
+        <button type="submit">✅ Одобрить</button>
+    </form>
+    <form method="post" action="{{ url_for('reject_track', track_id=track.id) }}" style="display: inline;">
+        <button type="submit">❌ Отклонить</button>
+    </form>
+</div>
+{% endfor %} {% else %}
+<p>Нет треков на модерации.</p>
+{% endif %}
+
+<p><a href="{{ url_for('index') }}">← На главную</a></p>
+{% endblock %}

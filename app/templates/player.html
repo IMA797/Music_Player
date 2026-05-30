@@ -9,8 +9,17 @@
 </div>
 
 <div>
-    <button id="prev-btn" {% if not prev_track %}disabled{% endif %}>⏮ Предыдущий</button>
-    <button id="next-btn" {% if not next_track %}disabled{% endif %}>Следующий ⏭</button>
+    <button id="shuffle-btn" title="Перемешать">🔀</button>
+    <button id="prev-btn" title="Предыдущий">⏮</button>
+    <button id="next-btn" title="Следующий" {% if not next_track %}disabled{% endif %}>⏭</button>
+    <button id="repeat-btn" title="Повторять">🔁</button>
+    <button id="queue-btn" title="Очередь">📋</button>
+</div>
+
+<!-- Блок очереди -->
+<div id="queue-panel" style="display: none; border: 1px solid #ccc; padding: 10px; margin: 10px 0;">
+    <h3>Очередь воспроизведения</h3>
+    <ol id="queue-list"></ol>
 </div>
 
 <p><a href="{{ url_for('search_track') }}">← Назад к поиску</a></p>
@@ -25,50 +34,147 @@
     const audio = document.getElementById('audio');
     const prevBtn = document.getElementById('prev-btn');
     const nextBtn = document.getElementById('next-btn');
+    const shuffleBtn = document.getElementById('shuffle-btn');
+    const repeatBtn = document.getElementById('repeat-btn');
+    const queueBtn = document.getElementById('queue-btn');
+    const queuePanel = document.getElementById('queue-panel');
+    const queueList = document.getElementById('queue-list');
     const trackTitle = document.getElementById('track-title');
     const trackArtist = document.getElementById('track-artist');
-    const playlistItems = document.querySelectorAll('#playlist li');
+    const playlist = document.getElementById('playlist');
 
-    if (playlistItems.length > 0) {
-        let currentIndex = -1;
-        const currentTrackId = "{{ current_track.id }}";
-        playlistItems.forEach((item, index) => {
-            if (item.dataset.id === currentTrackId) {
-                currentIndex = index;
-            }
-        });
+    let currentIndex = 0;
+    let isShuffled = false;
+    let isRepeating = false;
+    let originalOrder = [];
 
-        function playTrack(index) {
-            if (index >= 0 && index < playlistItems.length) {
-                const track = playlistItems[index];
-                audio.src = "/play/" + track.dataset.id;
-                audio.play();
-                trackTitle.textContent = track.dataset.title;
-                trackArtist.textContent = track.dataset.artist;
-                prevBtn.disabled = (index === 0);
-                nextBtn.disabled = (index === playlistItems.length - 1);
-                currentIndex = index;
-            }
+    const playlistItems = playlist.querySelectorAll('li');
+    originalOrder = Array.from(playlistItems);
+
+    const currentTrackId = "{{ current_track.id }}";
+    originalOrder.forEach((item, index) => {
+        if (item.dataset.id === currentTrackId) {
+            currentIndex = index;
         }
+    });
 
-        audio.addEventListener('ended', function() {
-            if (currentIndex < playlistItems.length - 1) {
-                playTrack(currentIndex + 1);
-            }
-        });
+    function updateButtons() {
+        const items = playlist.querySelectorAll('li');
+        prevBtn.disabled = (currentIndex === 0);
+        nextBtn.disabled = (currentIndex === items.length - 1);
+        shuffleBtn.style.opacity = isShuffled ? '1' : '0.5';
+        repeatBtn.style.opacity = isRepeating ? '1' : '0.5';
+    }
 
-        prevBtn.addEventListener('click', function() {
-            if (currentIndex > 0) {
-                playTrack(currentIndex - 1);
+    function renderQueue() {
+        const items = playlist.querySelectorAll('li');
+        queueList.innerHTML = '';
+        items.forEach((item, index) => {
+            const li = document.createElement('li');
+            li.textContent = item.dataset.title + ' — ' + item.dataset.artist;
+            if (index === currentIndex) {
+                li.style.fontWeight = 'bold';
+                li.textContent = '▶ ' + li.textContent;
             }
-        });
-
-        nextBtn.addEventListener('click', function() {
-            if (currentIndex < playlistItems.length - 1) {
-                playTrack(currentIndex + 1);
-            }
+            li.style.cursor = 'pointer';
+            li.addEventListener('click', function() {
+                playTrack(index);
+            });
+            queueList.appendChild(li);
         });
     }
+
+    function playTrack(index) {
+        const items = playlist.querySelectorAll('li');
+        if (index >= 0 && index < items.length) {
+            const track = items[index];
+            audio.src = "/play/" + track.dataset.id;
+            audio.play();
+            trackTitle.textContent = track.dataset.title;
+            trackArtist.textContent = track.dataset.artist;
+            currentIndex = index;
+            updateButtons();
+            renderQueue();
+        }
+    }
+
+    // Очередь показать/скрыть
+    queueBtn.addEventListener('click', function() {
+        if (queuePanel.style.display === 'none') {
+            queuePanel.style.display = 'block';
+            renderQueue();
+        } else {
+            queuePanel.style.display = 'none';
+        }
+    });
+
+    // Перемешивание
+    shuffleBtn.addEventListener('click', function() {
+        const items = Array.from(playlist.querySelectorAll('li'));
+        const currentItem = items[currentIndex];
+
+        if (!isShuffled) {
+            items.splice(currentIndex, 1);
+            for (let i = items.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [items[i], items[j]] = [items[j], items[i]];
+            }
+            items.unshift(currentItem);
+            currentIndex = 0;
+            isShuffled = true;
+        } else {
+            playlist.innerHTML = '';
+            originalOrder.forEach(item => playlist.appendChild(item.cloneNode(true)));
+            originalOrder.forEach((item, index) => {
+                if (item.dataset.id === currentTrackId) {
+                    currentIndex = index;
+                }
+            });
+            isShuffled = false;
+        }
+
+        if (isShuffled) {
+            playlist.innerHTML = '';
+            items.forEach(item => playlist.appendChild(item));
+        }
+
+        updateButtons();
+        renderQueue();
+    });
+
+    // Повтор
+    repeatBtn.addEventListener('click', function() {
+        isRepeating = !isRepeating;
+        updateButtons();
+    });
+
+    audio.addEventListener('ended', function() {
+        if (isRepeating) {
+            audio.currentTime = 0;
+            audio.play();
+        } else {
+            const items = playlist.querySelectorAll('li');
+            if (currentIndex < items.length - 1) {
+                playTrack(currentIndex + 1);
+            }
+        }
+    });
+
+    prevBtn.addEventListener('click', function() {
+        if (currentIndex > 0) {
+            playTrack(currentIndex - 1);
+        }
+    });
+
+    nextBtn.addEventListener('click', function() {
+        const items = playlist.querySelectorAll('li');
+        if (currentIndex < items.length - 1) {
+            playTrack(currentIndex + 1);
+        }
+    });
+
+    updateButtons();
+    renderQueue();
 </script>
 {% else %}
 <p>Трек не выбран. <a href="{{ url_for('search_track') }}">Перейти к поиску</a></p>

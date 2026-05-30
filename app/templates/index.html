@@ -1,5 +1,22 @@
 {% extends "base.html" %} {% block content %}
-<h1>Hi, {{ current_user.username }}!</h1>
-<p>Добро пожаловать в Music_Player.</p>
-<p><a href="{{ url_for('search_track') }}">🔍 Поиск музыки</a></p>
+<h1>Профиль</h1>
+<p>
+    <a href="{{ url_for('search_track') }}">🔍 Поиск музыки</a>
+</p>
+<div style="border: 1px solid #ccc; padding: 15px; margin-bottom: 20px;">
+    <h2>{{ username }}</h2>
+    <p><strong>Email:</strong> {{ email }}</p>
+    <p><strong>Роль:</strong> {{ role }}</p>
+</div>
+
+<div style="border: 1px solid #ccc; padding: 15px; margin-bottom: 20px;">
+    {% if current_user.role == 'admin' %}
+    <h3>Общая статистика</h3>{% else %}
+    <h3>Моя статистика</h3>{% endif %}
+    <p>Всего загружено: <strong>{{ count_of_all_tracks }}</strong></p>
+    <p>Одобрено: <strong>{{ count_of_approved_tracks }}</strong></p>
+    <p>На модерации: <strong>{{ count_of_pending_tracks }}</strong></p>
+    <p>Отклонено: <strong>{{ count_of_rejected_tracks }}</strong></p>
+</div>
+
 {% endblock %}

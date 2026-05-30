@@ -26,7 +26,18 @@ def admin_required(f):
 @app.route('/index')
 @login_required
 def index():
-    return render_template('index.html', title="Home")
+
+    if (current_user.role == 'admin'):
+        count_of_all_tracks = Track.query.count()
+        count_of_approved_tracks = Track.query.where(Track.status == 'approved').count()
+        count_of_pending_tracks = Track.query.where(Track.status == 'pending').count()
+        count_of_rejected_tracks = Track.query.where(Track.status == 'rejected').count()
+    else:
+        count_of_all_tracks = Track.query.where(Track.user_id == current_user.id).count()
+        count_of_approved_tracks = Track.query.where(Track.status == 'approved', Track.user_id == current_user.id).count()
+        count_of_pending_tracks = Track.query.where(Track.status == 'pending', Track.user_id == current_user.id).count()
+        count_of_rejected_tracks = Track.query.where(Track.status == 'rejected', Track.user_id == current_user.id).count()
+    return render_template('index.html', title="Home", username=current_user.username, email=current_user.email, role=current_user.role, count_of_all_tracks=count_of_all_tracks, count_of_approved_tracks=count_of_approved_tracks, count_of_pending_tracks=count_of_pending_tracks, count_of_rejected_tracks=count_of_rejected_tracks)
 
 @app.route("/login", methods=['GET', 'POST'])
 def login():

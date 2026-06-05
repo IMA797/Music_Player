@@ -1,6 +1,6 @@
 from flask import render_template, flash, redirect, url_for, request, session, send_from_directory, abort
 from app import app, db
-from app.forms import LoginForm, RegistrationForm, VerificationForm, AddMusic
+from app.forms import LoginForm, RegistrationForm, VerificationForm, AddMusic, CreatePlaylistForm
 from flask_login import current_user, login_user, logout_user, login_required
 from app.models import *
 import sqlalchemy as sa
@@ -37,8 +37,11 @@ def index():
         count_of_approved_tracks = Track.query.where(Track.status == 'approved', Track.user_id == current_user.id).count()
         count_of_pending_tracks = Track.query.where(Track.status == 'pending', Track.user_id == current_user.id).count()
         count_of_rejected_tracks = Track.query.where(Track.status == 'rejected', Track.user_id == current_user.id).count()
-    return render_template('index.html', title="Home", username=current_user.username, email=current_user.email, role=current_user.role, count_of_all_tracks=count_of_all_tracks, count_of_approved_tracks=count_of_approved_tracks, count_of_pending_tracks=count_of_pending_tracks, count_of_rejected_tracks=count_of_rejected_tracks)
 
+    user_playlists = db.session.scalars(sa.select(PlayList).where(PlayList.user_id == current_user.id).order_by(PlayList.created_at.desc())).all()
+
+
+    return render_template('index.html', title="Home", username=current_user.username, email=current_user.email, role=current_user.role, count_of_all_tracks=count_of_all_tracks, count_of_approved_tracks=count_of_approved_tracks, count_of_pending_tracks=count_of_pending_tracks, count_of_rejected_tracks=count_of_rejected_tracks, user_playlists=user_playlists)
 @app.route("/login", methods=['GET', 'POST'])
 def login():
     if current_user.is_authenticated:
@@ -221,7 +224,9 @@ def search_track():
             sa.select(Track).where(Track.title.ilike(f'%{query}%'), Track.status == 'approved').order_by(Track.uploaded_at.desc())
         ).all()
     
-    return render_template('search.html', title='Поиск', tracks=tracks, query=query)
+    user_playlists = db.session.scalars(sa.select(PlayList).where(PlayList.user_id == current_user.id)).all()
+
+    return render_template('search.html', title='Поиск', tracks=tracks, query=query, user_playlists=user_playlists)
 
 
 @app.route('/player')
@@ -229,9 +234,17 @@ def search_track():
 def player():
     track_id = request.args.get('track', type=int)
     
-    tracks = db.session.scalars(
-        sa.select(Track).where(Track.status == 'approved').order_by(Track.uploaded_at.desc())
-    ).all()
+    playlist_id = request.args.get('playlist_id', type=int)
+    
+    if playlist_id:
+        playlist = db.session.get(PlayList, playlist_id)
+        if playlist:
+            tracks = db.session.scalars(sa.select(Track).where(Track.playlists.any(PlayList.id == playlist_id), Track.status == 'approved').order_by(Track.uploaded_at.desc())).all()
+        else:
+            tracks = []
+    else:
+        tracks = db.session.scalars(
+            sa.select(Track).where(Track.status == 'approved').order_by(Track.uploaded_at.desc())).all()
     
     current_track = None
     next_track = None
@@ -301,3 +314,56 @@ def reject_track(track_id):
         flash('Трек не найден или уже обработан.')
         return redirect(url_for('admin'))
     
+@app.route('/playlist/create', methods=['GET', 'POST'])
+@login_required
+def create_playlist():
+    form = CreatePlaylistForm()
+
+    if form.validate_on_submit():
+
+        playlist = PlayList(name=form.name.data, user_id=current_user.id)
+
+        db.session.add(playlist)
+        db.session.commit()
+
+        return redirect(url_for('view_playlist', playlist_id=playlist.id))
+    return render_template('create_playlist.html', title='Создать плейлист', form=form)
+
+@app.route('/playlist/<int:playlist_id>', methods=['GET'])
+@login_required
+def view_playlist(playlist_id):
+    playlist = db.session.get(PlayList, playlist_id)
+    
+    if not playlist:
+        flash('Плейлист не найден.')
+        return redirect(url_for('index'))
+    
+    tracks = db.session.scalars(
+        sa.select(Track).where(Track.playlists.any(PlayList.id == playlist_id), Track.status == 'approved').order_by(Track.uploaded_at.desc())).all()
+    
+    return render_template(
+        'playlist.html',
+        title=playlist.name,
+        playlist=playlist,
+        tracks=tracks
+    )
+
+@app.route('/playlist/<int:playlist_id>/add/<int:track_id>', methods=['POST'])
+@login_required
+def add_to_playlist(playlist_id, track_id):
+    playlist = db.session.get(PlayList, playlist_id)
+    track = db.session.get(Track, track_id)
+    
+    if not playlist or not track:
+        flash('Плейлист или трек не найден.')
+        return redirect(url_for('search_track'))
+    
+    if playlist.user_id != current_user.id:
+        flash('Это не ваш плейлист.')
+        return redirect(url_for('search_track'))
+    
+    playlist.tracks.add(track)
+    db.session.commit()
+    
+    flash(f'Трек "{track.title}" добавлен в плейлист "{playlist.name}".')
+    return redirect(url_for('search_track'))

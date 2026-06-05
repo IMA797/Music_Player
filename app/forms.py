@@ -41,3 +41,7 @@ class AddMusic(FlaskForm):
     artist = StringField('Artist', validators=[DataRequired()])
     file = FileField('File', validators=[FileRequired(), FileAllowed(['mp3', 'wav', 'ogg', 'flac'], 'Только аудиофайлы!')])
     submit = SubmitField('Save')
+
+class CreatePlaylistForm(FlaskForm):
+    name = StringField('Name', validators=[DataRequired()])
+    submit = SubmitField('Add')

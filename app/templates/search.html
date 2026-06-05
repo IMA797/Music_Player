@@ -12,6 +12,17 @@
 <div style="border: 1px solid #ccc; padding: 10px; margin: 10px 0;">
     <strong>{{ track.title }}</strong> — {{ track.artist }}
     <a href="{{ url_for('player', track=track.id) }}">▶ Играть</a>
+
+    <!-- Кнопка сохранения в плейлист -->
+    <form method="post" action="{{ url_for('add_to_playlist', playlist_id=0, track_id=track.id) }}" style="display: inline;" id="form-{{ track.id }}">
+        <select name="playlist_id" onchange="document.getElementById('form-{{ track.id }}').action = '/playlist/' + this.value + '/add/{{ track.id }}';">
+                    <option value="">-- В плейлист --</option>
+                    {% for playlist in user_playlists %}
+                        <option value="{{ playlist.id }}">{{ playlist.name }}</option>
+                    {% endfor %}
+                </select>
+        <button type="submit">💾</button>
+    </form>
 </div>
 {% endfor %} {% elif query and not tracks %}
 <p>Ничего не найдено.</p>

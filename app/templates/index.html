@@ -1,8 +1,6 @@
 {% extends "base.html" %} {% block content %}
 <h1>Профиль</h1>
-<p>
-    <a href="{{ url_for('search_track') }}">🔍 Поиск музыки</a>
-</p>
+
 <div style="border: 1px solid #ccc; padding: 15px; margin-bottom: 20px;">
     <h2>{{ username }}</h2>
     <p><strong>Email:</strong> {{ email }}</p>
@@ -10,13 +8,29 @@
 </div>
 
 <div style="border: 1px solid #ccc; padding: 15px; margin-bottom: 20px;">
-    {% if current_user.role == 'admin' %}
-    <h3>Общая статистика</h3>{% else %}
-    <h3>Моя статистика</h3>{% endif %}
+    <h3>Статистика треков</h3>
     <p>Всего загружено: <strong>{{ count_of_all_tracks }}</strong></p>
     <p>Одобрено: <strong>{{ count_of_approved_tracks }}</strong></p>
     <p>На модерации: <strong>{{ count_of_pending_tracks }}</strong></p>
     <p>Отклонено: <strong>{{ count_of_rejected_tracks }}</strong></p>
 </div>
 
+<div style="border: 1px solid #ccc; padding: 15px; margin-bottom: 20px;">
+    <h3>Мои плейлисты</h3>
+    {% if user_playlists %}
+    <ul>
+        {% for playlist in user_playlists %}
+        <li>
+            <a href="{{ url_for('view_playlist', playlist_id=playlist.id) }}">{{ playlist.name }}</a>
+        </li>
+        {% endfor %}
+    </ul>
+    {% else %}
+    <p>У вас пока нет плейлистов.</p>
+    {% endif %}
+    <a href="{{ url_for('create_playlist') }}">➕ Создать плейлист</a>
+</div>
+
+<p>
+    <a href="{{ url_for('search_track') }}">🔍 Поиск музыки</a> </p>
 {% endblock %}
